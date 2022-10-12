@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\EmployeeResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\EmployeeResource\RelationManagers;
+use App\Models\City;
+use App\Models\Country;
+use App\Models\State;
 
 class EmployeeResource extends Resource
 {
@@ -32,11 +35,31 @@ class EmployeeResource extends Resource
                 Card::make()
                     ->schema([
                         Select::make('country_id')
-                            ->relationship('country', 'name')->required(),
+                            ->label('Country')
+                            ->options(Country::all()->pluck('name', 'id')->toArray())
+                            ->reactive()
+                            ->afterStateUpdated(fn (callable $set) => $set('state_id', 'null')),
                         Select::make('state_id')
-                            ->relationship('state', 'name')->required(),
+                            ->label('State')
+                            ->options(function (callable $get) {
+                                $country = Country::find($get('country_id'));
+                                if(!$country) {
+                                    return State::all()->pluck('name', 'id');
+                                }
+                                return $country->states->pluck('name', 'id');
+                            })
+                            ->reactive()
+                            ->afterStateUpdated(fn (callable $set) => $set('city_id', 'null')),
                         Select::make('city_id')
-                            ->relationship('city', 'name')->required(),
+                            ->label('City')
+                            ->options(function (callable $get) {
+                                $state = State::find($get('state_id'));
+                                if(!$state) {
+                                    return City::all()->pluck('name', 'id');
+                                }
+                                return $state->cities->pluck('name', 'id');
+                            })
+                            ->reactive(),
                         Select::make('department_id')
                             ->relationship('department', 'name')->required(),
                         TextInput::make('first_name')->required(),
